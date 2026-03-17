@@ -11,6 +11,9 @@ export type StorageNodeData = {
   color: string;
   depth: number;
   collapsed: boolean;
+  // 独立ノード（ルート）の手動配置位置。子ノードはレイアウト計算で自動配置
+  posX: number;
+  posY: number;
 };
 
 // Liveblocks で同期するエッジデータ
@@ -19,6 +22,8 @@ export type StorageEdgeData = {
   source: string;
   target: string;
   color: string;
+  // "tree" = 親子関係（マインドマップ構造）、"relation" = 関連線（矢印付き曲線）
+  edgeType: "tree" | "relation";
 };
 
 // プレゼンス（カーソル位置・選択中ノード）
@@ -28,10 +33,19 @@ type Presence = {
   nickname: string;
 };
 
+// グループデータ
+export type StorageGroupData = {
+  id: string;
+  label: string;
+  color: string;
+  nodeIds: string[];
+};
+
 // Storage の型定義
 type Storage = {
   nodes: LiveMap<string, LiveObject<StorageNodeData>>;
   edges: LiveMap<string, LiveObject<StorageEdgeData>>;
+  groups: LiveMap<string, LiveObject<StorageGroupData>>;
   mapName: LiveObject<{ value: string }>;
 };
 

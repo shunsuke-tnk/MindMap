@@ -115,13 +115,12 @@ export function MindMapNodeComponent({
 
   return (
     <div className="relative group" onDoubleClick={handleDoubleClick}>
-      {!isRoot && (
-        <Handle
-          type="target"
-          position={isHorizontal ? Position.Left : Position.Top}
-          className="!w-0 !h-0 !border-0 !bg-transparent"
-        />
-      )}
+      <Handle
+        id="target"
+        type="target"
+        position={isHorizontal ? Position.Left : Position.Top}
+        className="!w-3 !h-3 !bg-indigo-300 !border-2 !border-white opacity-0 group-hover:opacity-100 transition-opacity !z-20"
+      />
 
       {/* ノード本体 — span が常にサイズを決定し、input は上に重ねる */}
       <div
@@ -164,15 +163,16 @@ export function MindMapNodeComponent({
       </div>
 
       <Handle
+        id="source"
         type="source"
         position={isHorizontal ? Position.Right : Position.Bottom}
-        className="!w-0 !h-0 !border-0 !bg-transparent"
+        className="!w-3 !h-3 !bg-indigo-300 !border-2 !border-white opacity-0 group-hover:opacity-100 transition-opacity !z-20"
       />
 
       {!data.collapsed && (
         <button
           onClick={handleAddChildClick}
-          className={`absolute w-6 h-6 rounded-full bg-white shadow-md border border-gray-200 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-gray-500 hover:text-blue-500 hover:border-blue-300 text-sm ${
+          className={`absolute z-10 w-6 h-6 rounded-full bg-white shadow-md border border-gray-200 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-gray-500 hover:text-blue-500 hover:border-blue-300 text-sm ${
             isHorizontal
               ? "-right-3 top-1/2 -translate-y-1/2"
               : "-bottom-3 left-1/2 -translate-x-1/2"

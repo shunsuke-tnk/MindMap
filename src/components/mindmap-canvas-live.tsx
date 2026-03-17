@@ -10,6 +10,7 @@ import {
   type OnConnect,
   ConnectionMode,
   SelectionMode,
+  MarkerType,
   Panel,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
@@ -22,6 +23,8 @@ import type {
 } from "@/types/mindmap";
 import { MindMapNodeComponent } from "@/components/mindmap-node";
 import { MindMapEdgeComponent } from "@/components/mindmap-edge";
+import { RelationEdgeComponent } from "@/components/relation-edge";
+import { GroupOverlay } from "@/components/group-overlay";
 import { MindMapProvider } from "@/lib/mindmap-context";
 import { useMindMapLayout } from "@/hooks/use-mindmap-layout";
 import { getNodeColor, ROOT_COLOR } from "@/lib/colors";
@@ -35,7 +38,10 @@ import {
 } from "@/lib/liveblocks";
 
 const nodeTypes = { mindmap: MindMapNodeComponent };
-const edgeTypes: EdgeTypes = { mindmap: MindMapEdgeComponent };
+const edgeTypes: EdgeTypes = {
+  mindmap: MindMapEdgeComponent,
+  relation: RelationEdgeComponent,
+};
 
 let nodeIdCounter = 0;
 function generateNodeId(): string {
@@ -76,7 +82,7 @@ function storageToReactFlow(
     nodes.push({
       id: data.id,
       type: "mindmap",
-      position: { x: 0, y: 0 },
+      position: { x: data.posX ?? 0, y: data.posY ?? 0 },
       data: {
         label: data.label,
         color: data.color,
@@ -86,33 +92,50 @@ function storageToReactFlow(
     });
   });
 
-  const edges: MindMapEdge[] = [];
+  // ツリーエッジと関連線を分けて処理
+  const treeEdges: MindMapEdge[] = [];
+  const relationEdges: MindMapEdge[] = [];
   storageEdges.forEach((data) => {
-    edges.push({
-      id: data.id,
-      source: data.source,
-      target: data.target,
-      type: "mindmap",
-      data: { color: data.color },
-    });
+    const edgeType = data.edgeType ?? "tree";
+    if (edgeType === "relation") {
+      relationEdges.push({
+        id: data.id,
+        source: data.source,
+        target: data.target,
+        type: "relation",
+        data: { color: data.color },
+        animated: true,
+        markerEnd: { type: MarkerType.ArrowClosed, color: data.color },
+      });
+    } else {
+      treeEdges.push({
+        id: data.id,
+        source: data.source,
+        target: data.target,
+        type: "mindmap",
+        data: { color: data.color },
+      });
+    }
   });
 
-  return { nodes, edges };
+  return { nodes, edges: [...treeEdges, ...relationEdges] };
 }
 
 interface MindMapCanvasLiveProps {
   direction: LayoutDirection;
   mode: CanvasMode;
+  onSelectionChange?: (selectedIds: string[]) => void;
 }
 
-export function MindMapCanvasLive({ direction, mode }: MindMapCanvasLiveProps) {
+export function MindMapCanvasLive({ direction, mode, onSelectionChange }: MindMapCanvasLiveProps) {
   const storageNodes = useStorage((root) => root.nodes);
   const storageEdges = useStorage((root) => root.edges);
   const updatePresence = useUpdateMyPresence();
 
   const [nodes, setNodes, onNodesChange] = useNodesState<MindMapNode>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<MindMapEdge>([]);
-  const { fitView, setCenter } = useReactFlow();
+  const reactFlowInstance = useReactFlow();
+  const { fitView } = reactFlowInstance;
   const { calculateLayout } = useMindMapLayout();
   const layoutTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevStorageRef = useRef<string>("");
@@ -210,6 +233,8 @@ export function MindMapCanvasLive({ direction, mode }: MindMapCanvasLiveProps) {
           color,
           depth: newDepth,
           collapsed: false,
+          posX: 0,
+          posY: 0,
         })
       );
 
@@ -221,6 +246,7 @@ export function MindMapCanvasLive({ direction, mode }: MindMapCanvasLiveProps) {
           source: parentId,
           target: newId,
           color: parentData.color,
+          edgeType: "tree",
         })
       );
 
@@ -397,25 +423,103 @@ export function MindMapCanvasLive({ direction, mode }: MindMapCanvasLiveProps) {
     updatePresence({ cursor: null });
   }, [updatePresence]);
 
-  // ノード選択時にプレゼンス更新
+  // ノード選択時にプレゼンス更新 + 親コンポーネントに通知
   const handleSelectionChange = useCallback(() => {
-    const selected = nodes.find((n) => n.selected);
-    updatePresence({ selectedNodeId: selected?.id ?? null });
-  }, [nodes, updatePresence]);
+    const selectedIds = nodes.filter((n) => n.selected).map((n) => n.id);
+    updatePresence({ selectedNodeId: selectedIds[0] ?? null });
+    onSelectionChange?.(selectedIds);
+  }, [nodes, updatePresence, onSelectionChange]);
 
   useEffect(() => {
     handleSelectionChange();
   }, [handleSelectionChange]);
 
-  const onConnect: OnConnect = useCallback(() => {}, []);
-
-  // requestEdit をコンテキストから受け取って ref に保持するためのラッパー
-  const handleRequestEdit = useCallback(
-    (nodeId: string, trigger: "select" | "overwrite") => {
-      // この関数は MindMapProvider 経由で呼ばれる
-      // 実際の処理は subscribeEdit で各ノードが購読している
+  // 関連線（矢印）の接続ハンドラ
+  const addRelationEdge = useMutation(
+    ({ storage }, sourceId: string, targetId: string) => {
+      const edgesMap = storage.get("edges");
+      const edgeId = `relation-${sourceId}-${targetId}-${Date.now()}`;
+      edgesMap.set(
+        edgeId,
+        new LiveObject<StorageEdgeData>({
+          id: edgeId,
+          source: sourceId,
+          target: targetId,
+          color: "#94A3B8",
+          edgeType: "relation",
+        })
+      );
     },
     []
+  );
+
+  const onConnect: OnConnect = useCallback(
+    (params) => {
+      if (params.source && params.target && params.source !== params.target) {
+        addRelationEdge(params.source, params.target);
+      }
+    },
+    [addRelationEdge]
+  );
+
+  // 空白ダブルクリックで独立ノード追加
+  const addIndependentNode = useMutation(
+    ({ storage }, posX: number, posY: number) => {
+      const nodesMap = storage.get("nodes");
+      const newId = generateNodeId();
+
+      // 独立ノードの色をサイクリックに割り当て
+      const rootCount = Array.from(nodesMap.values()).filter(
+        (n) => n.toObject().depth === 0
+      ).length;
+      const colors = [ROOT_COLOR, "#8B5CF6", "#059669", "#DC2626", "#0891B2", "#D97706"];
+      const color = colors[rootCount % colors.length];
+
+      nodesMap.set(
+        newId,
+        new LiveObject<StorageNodeData>({
+          id: newId,
+          label: "新しいテーマ",
+          color,
+          depth: 0,
+          collapsed: false,
+          posX,
+          posY,
+        })
+      );
+      return newId;
+    },
+    []
+  );
+
+  // ペーンのダブルクリック検知（onPaneClick ベース）
+  const lastPaneClickRef = useRef<{ time: number; x: number; y: number }>({ time: 0, x: 0, y: 0 });
+
+  const handlePaneClick = useCallback(
+    (event: React.MouseEvent) => {
+      if (mode !== "pointer") return;
+      const now = Date.now();
+      const last = lastPaneClickRef.current;
+      const isDoubleClick =
+        now - last.time < 400 &&
+        Math.abs(event.clientX - last.x) < 10 &&
+        Math.abs(event.clientY - last.y) < 10;
+
+      lastPaneClickRef.current = { time: now, x: event.clientX, y: event.clientY };
+
+      if (!isDoubleClick) return;
+
+      // ダブルクリック確定 → 独立ノード作成
+      const position = reactFlowInstance.screenToFlowPosition({
+        x: event.clientX,
+        y: event.clientY,
+      });
+      const newId = addIndependentNode(position.x, position.y);
+      if (newId) {
+        pendingEditNodeRef.current = newId;
+      }
+    },
+    [mode, addIndependentNode, reactFlowInstance]
   );
 
   if (!storageNodes || !storageEdges) {
@@ -462,11 +566,13 @@ export function MindMapCanvasLive({ direction, mode }: MindMapCanvasLiveProps) {
           selectionMode={SelectionMode.Partial}
           nodesDraggable={mode === "pointer"}
           elementsSelectable={mode === "pointer"}
-          nodesConnectable={false}
+          nodesConnectable={mode === "pointer"}
+          onPaneClick={handlePaneClick}
         >
+          <GroupOverlay selectedNodeIds={nodes.filter((n) => n.selected).map((n) => n.id)} />
           <Panel position="bottom-center" className="text-xs text-gray-400">
-            Enter: 兄弟追加 | Tab: 子追加 | Delete: 削除 | Space/F2:
-            編集 | H: ハンド | V: ポインター
+            Enter: 兄弟追加 | Tab: 子追加 | Delete: 削除 | Ctrl+L:
+            関連線 | Ctrl+]: グループ
           </Panel>
         </ReactFlow>
       </div>

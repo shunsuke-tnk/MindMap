@@ -7,10 +7,12 @@ import type { LayoutDirection } from "@/types/mindmap";
 interface ToolbarProps {
   direction: LayoutDirection;
   onDirectionChange: (direction: LayoutDirection) => void;
+  onGroupSelected?: () => void;
+  hasSelection?: boolean;
   children?: React.ReactNode;
 }
 
-export function Toolbar({ direction, onDirectionChange, children }: ToolbarProps) {
+export function Toolbar({ direction, onDirectionChange, onGroupSelected, hasSelection, children }: ToolbarProps) {
   const { zoomIn, zoomOut, fitView } = useReactFlow();
   const [copied, setCopied] = useState(false);
   const [mapName, setMapName] = useState("無題のマップ");
@@ -123,6 +125,16 @@ export function Toolbar({ direction, onDirectionChange, children }: ToolbarProps
             ロジックツリー
           </button>
         </div>
+
+        {/* グループ化ボタン（複数選択時のみ表示） */}
+        {hasSelection && onGroupSelected && (
+          <button
+            onClick={onGroupSelected}
+            className="px-3 py-1 text-sm bg-violet-100 text-violet-600 rounded-lg hover:bg-violet-200 transition-colors"
+          >
+            グループ化
+          </button>
+        )}
       </div>
 
       {/* 右: 参加者・ズーム・共有 */}
