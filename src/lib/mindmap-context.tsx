@@ -3,14 +3,13 @@
 import { createContext, useContext, useCallback, useRef } from "react";
 import type { LayoutDirection } from "@/types/mindmap";
 
-// ノードの編集開始モード
 type EditTrigger = "select" | "overwrite";
 
 interface MindMapContextValue {
   onLabelChange: (nodeId: string, label: string) => void;
   onAddChild: (parentId: string) => void;
+  onAddSibling: (nodeId: string) => void;
   direction: LayoutDirection;
-  // ノードの編集状態を外部から制御するための仕組み
   requestEdit: (nodeId: string, trigger: EditTrigger) => void;
   subscribeEdit: (nodeId: string, callback: (trigger: EditTrigger) => void) => () => void;
 }
@@ -18,6 +17,7 @@ interface MindMapContextValue {
 const MindMapContext = createContext<MindMapContextValue>({
   onLabelChange: () => {},
   onAddChild: () => {},
+  onAddSibling: () => {},
   direction: "horizontal",
   requestEdit: () => {},
   subscribeEdit: () => () => {},
@@ -27,11 +27,11 @@ export function MindMapProvider({
   children,
   onLabelChange,
   onAddChild,
+  onAddSibling,
   direction,
 }: Omit<MindMapContextValue, "requestEdit" | "subscribeEdit"> & {
   children: React.ReactNode;
 }) {
-  // ノードID → コールバックのマップ（ref で管理して再レンダリングを避ける）
   const listenersRef = useRef<Map<string, (trigger: EditTrigger) => void>>(new Map());
 
   const requestEdit = useCallback((nodeId: string, trigger: EditTrigger) => {
@@ -51,7 +51,7 @@ export function MindMapProvider({
 
   return (
     <MindMapContext.Provider
-      value={{ onLabelChange, onAddChild, direction, requestEdit, subscribeEdit }}
+      value={{ onLabelChange, onAddChild, onAddSibling, direction, requestEdit, subscribeEdit }}
     >
       {children}
     </MindMapContext.Provider>

@@ -254,7 +254,7 @@ export function MindMapCanvas({ direction }: MindMapCanvasProps) {
   const onConnect: OnConnect = useCallback(() => {}, []);
 
   return (
-    <MindMapProvider onLabelChange={handleLabelChange} onAddChild={handleAddChild} direction={direction}>
+    <MindMapProvider onLabelChange={handleLabelChange} onAddChild={handleAddChild} onAddSibling={handleAddSibling} direction={direction}>
       <div className="w-full h-full" onKeyDown={handleKeyDown} tabIndex={0}>
         <ReactFlow
           nodes={nodes}

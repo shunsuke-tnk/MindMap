@@ -11,7 +11,7 @@ export function MindMapNodeComponent({
   data,
   selected,
 }: NodeProps<MindMapNode>) {
-  const { onLabelChange, onAddChild, direction, subscribeEdit } =
+  const { onLabelChange, onAddChild, onAddSibling, direction, subscribeEdit } =
     useMindMapContext();
   const isHorizontal = direction === "horizontal";
 
@@ -82,6 +82,7 @@ export function MindMapNodeComponent({
   }, [data.label]);
 
   // 編集中のキー操作
+  // XMind風: Enter → 確定 + 兄弟追加、Tab → 確定 + 子追加
   const handleInputKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {
       switch (e.key) {
@@ -89,6 +90,8 @@ export function MindMapNodeComponent({
           e.preventDefault();
           e.stopPropagation();
           commitEdit();
+          // 確定と同時に兄弟ノード追加
+          onAddSibling(id);
           break;
         case "Escape":
           e.preventDefault();
@@ -96,19 +99,18 @@ export function MindMapNodeComponent({
           cancelEdit();
           break;
         case "Tab":
-          // 編集中のTabは確定して子ノード追加に委譲
           e.preventDefault();
           e.stopPropagation();
           commitEdit();
-          // キャンバス側のTabハンドラが処理する
+          // 確定と同時に子ノード追加
+          onAddChild(id);
           break;
         default:
-          // 編集中の他のキーはキャンバスに伝播させない
           e.stopPropagation();
           break;
       }
     },
-    [commitEdit, cancelEdit]
+    [commitEdit, cancelEdit, id, onAddChild, onAddSibling]
   );
 
   const handleInputBlur = useCallback(() => {

@@ -257,28 +257,34 @@ export function MindMapCanvasLive({ direction, mode }: MindMapCanvasLiveProps) {
     [storageEdges, handleAddChild]
   );
 
-  // ノード削除
-  const handleDeleteNode = useCallback(
-    (nodeId: string) => {
+  // ノード削除（複数ノード対応）
+  const handleDeleteNodes = useCallback(
+    (nodeIds: string[]) => {
       if (!storageNodes || !storageEdges) return;
-      const node = storageNodes.get(nodeId);
-      if (!node || node.depth === 0) return;
 
       const edgesArr: StorageEdgeData[] = [];
       storageEdges.forEach((e: StorageEdgeData) => edgesArr.push(e));
 
-      const descendantIds = new Set<string>();
-      const stack = [nodeId];
-      while (stack.length > 0) {
-        const current = stack.pop()!;
-        descendantIds.add(current);
-        const children = edgesArr
-          .filter((e) => e.source === current)
-          .map((e) => e.target);
-        stack.push(...children);
+      const allIdsToDelete = new Set<string>();
+      for (const nodeId of nodeIds) {
+        const node = storageNodes.get(nodeId);
+        if (!node || node.depth === 0) continue; // ルートは削除不可
+
+        // 対象ノードとその子孫すべてを収集
+        const stack = [nodeId];
+        while (stack.length > 0) {
+          const current = stack.pop()!;
+          allIdsToDelete.add(current);
+          const children = edgesArr
+            .filter((e) => e.source === current)
+            .map((e) => e.target);
+          stack.push(...children);
+        }
       }
 
-      deleteNodesMutation(Array.from(descendantIds));
+      if (allIdsToDelete.size > 0) {
+        deleteNodesMutation(Array.from(allIdsToDelete));
+      }
     },
     [storageNodes, storageEdges]
   );
@@ -318,41 +324,44 @@ export function MindMapCanvasLive({ direction, mode }: MindMapCanvasLiveProps) {
         return;
       }
 
-      const selectedNode = nodes.find((n) => n.selected);
-      if (!selectedNode) return;
+      const selectedNodes = nodes.filter((n) => n.selected);
+      if (selectedNodes.length === 0) return;
 
       switch (event.key) {
-        // Tab: 子ノード追加 + 即座に編集モード
+        // Tab: 子ノード追加 + 即座に編集モード（最後に選択したノードが対象）
         case "Tab": {
           event.preventDefault();
-          handleAddChild(selectedNode.id);
+          handleAddChild(selectedNodes[selectedNodes.length - 1].id);
           break;
         }
         // Enter: 兄弟ノード追加 + 即座に編集モード
         case "Enter": {
           event.preventDefault();
-          handleAddSibling(selectedNode.id);
+          handleAddSibling(selectedNodes[selectedNodes.length - 1].id);
           break;
         }
-        // Delete/Backspace: ノード削除
+        // Delete/Backspace: 選択中の全ノードを削除
         case "Delete":
         case "Backspace": {
           event.preventDefault();
-          handleDeleteNode(selectedNode.id);
+          handleDeleteNodes(selectedNodes.map((n) => n.id));
           break;
         }
-        // F2/Space: テキスト編集モード開始（テキスト選択状態）
+        // F2/Space: テキスト編集モード開始（単一選択時のみ）
         case "F2":
         case " ": {
-          event.preventDefault();
-          if (requestEditRef.current) {
-            requestEditRef.current(selectedNode.id, "select");
+          if (selectedNodes.length === 1) {
+            event.preventDefault();
+            if (requestEditRef.current) {
+              requestEditRef.current(selectedNodes[0].id, "select");
+            }
           }
           break;
         }
-        // それ以外の印字可能文字: 直接入力で上書き編集モード開始
+        // それ以外の印字可能文字: 直接入力で上書き編集モード開始（単一選択時のみ）
         default: {
           if (
+            selectedNodes.length === 1 &&
             event.key.length === 1 &&
             !event.ctrlKey &&
             !event.metaKey &&
@@ -360,7 +369,7 @@ export function MindMapCanvasLive({ direction, mode }: MindMapCanvasLiveProps) {
           ) {
             event.preventDefault();
             if (requestEditRef.current) {
-              requestEditRef.current(selectedNode.id, "overwrite");
+              requestEditRef.current(selectedNodes[0].id, "overwrite");
               // 最初の1文字を入力するため、少し遅延してからキーを送る
               setTimeout(() => {
                 const activeInput = document.querySelector(
@@ -390,7 +399,7 @@ export function MindMapCanvasLive({ direction, mode }: MindMapCanvasLiveProps) {
         }
       }
     },
-    [nodes, handleAddChild, handleAddSibling, handleDeleteNode]
+    [nodes, handleAddChild, handleAddSibling, handleDeleteNodes]
   );
 
   // マウス移動でプレゼンス更新
@@ -444,6 +453,7 @@ export function MindMapCanvasLive({ direction, mode }: MindMapCanvasLiveProps) {
     <MindMapProviderWithRef
       onLabelChange={handleLabelChange}
       onAddChild={handleAddChild}
+      onAddSibling={handleAddSibling}
       direction={direction}
       requestEditRef={requestEditRef}
     >
@@ -492,12 +502,14 @@ function MindMapProviderWithRef({
   children,
   onLabelChange,
   onAddChild,
+  onAddSibling,
   direction,
   requestEditRef,
 }: {
   children: React.ReactNode;
   onLabelChange: (nodeId: string, label: string) => void;
   onAddChild: (parentId: string) => void;
+  onAddSibling: (nodeId: string) => void;
   direction: LayoutDirection;
   requestEditRef: React.MutableRefObject<
     ((nodeId: string, trigger: "select" | "overwrite") => void) | null
@@ -507,6 +519,7 @@ function MindMapProviderWithRef({
     <MindMapProvider
       onLabelChange={onLabelChange}
       onAddChild={onAddChild}
+      onAddSibling={onAddSibling}
       direction={direction}
     >
       <RequestEditBridge requestEditRef={requestEditRef} />
