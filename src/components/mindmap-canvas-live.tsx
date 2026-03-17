@@ -206,7 +206,7 @@ export function MindMapCanvasLive({ direction, mode }: MindMapCanvasLiveProps) {
         newId,
         new LiveObject<StorageNodeData>({
           id: newId,
-          label: "",
+          label: " ",
           color,
           depth: newDepth,
           collapsed: false,
@@ -358,7 +358,7 @@ export function MindMapCanvasLive({ direction, mode }: MindMapCanvasLiveProps) {
           }
           break;
         }
-        // それ以外の印字可能文字: 直接入力で上書き編集モード開始（単一選択時のみ）
+        // それ以外の印字可能文字: 編集モード開始（テキスト全選択 → 入力で置換）
         default: {
           if (
             selectedNodes.length === 1 &&
@@ -369,30 +369,7 @@ export function MindMapCanvasLive({ direction, mode }: MindMapCanvasLiveProps) {
           ) {
             event.preventDefault();
             if (requestEditRef.current) {
-              requestEditRef.current(selectedNodes[0].id, "overwrite");
-              // 最初の1文字を入力するため、少し遅延してからキーを送る
-              setTimeout(() => {
-                const activeInput = document.querySelector(
-                  ".react-flow__node.selected input"
-                ) as HTMLInputElement | null;
-                if (activeInput) {
-                  activeInput.value = event.key;
-                  activeInput.dispatchEvent(
-                    new Event("input", { bubbles: true })
-                  );
-                  // React の onChange を発火させるために nativeInputValueSetter を使う
-                  const nativeSetter = Object.getOwnPropertyDescriptor(
-                    window.HTMLInputElement.prototype,
-                    "value"
-                  )?.set;
-                  if (nativeSetter) {
-                    nativeSetter.call(activeInput, event.key);
-                    activeInput.dispatchEvent(
-                      new Event("input", { bubbles: true })
-                    );
-                  }
-                }
-              }, 50);
+              requestEditRef.current(selectedNodes[0].id, "select");
             }
           }
           break;

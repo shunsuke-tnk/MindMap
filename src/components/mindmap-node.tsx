@@ -23,7 +23,6 @@ export function MindMapNodeComponent({
   const textColor = getTextColor(data.depth);
   const isRoot = data.depth === 0;
 
-  // data.label が外部から更新されたら同期
   useEffect(() => {
     if (!isEditing) {
       setEditText(data.label);
@@ -34,32 +33,27 @@ export function MindMapNodeComponent({
   useEffect(() => {
     const unsubscribe = subscribeEdit(id, (trigger) => {
       if (trigger === "overwrite") {
-        // 上書きモード: テキストを空にして編集開始
         setEditText("");
-        setIsEditing(true);
       } else {
-        // 選択モード（F2/Space/ダブルクリック）: テキストを選択して編集開始
         setEditText(data.label);
-        setIsEditing(true);
       }
+      setIsEditing(true);
     });
     return unsubscribe;
   }, [id, subscribeEdit, data.label]);
 
-  // 編集モード開始時にフォーカスとテキスト選択
+  // 編集モード開始時にフォーカス
+  const prevEditingRef = useRef(false);
   useEffect(() => {
-    if (isEditing && inputRef.current) {
+    if (isEditing && !prevEditingRef.current && inputRef.current) {
       inputRef.current.focus();
-      // "select" トリガーの場合は全選択、"overwrite" の場合はカーソルを末尾に
-      if (editText === "") {
-        // overwrite mode: カーソルが末尾（空文字なので関係なし）
-      } else {
+      if (editText !== "") {
         inputRef.current.select();
       }
     }
+    prevEditingRef.current = isEditing;
   }, [isEditing, editText]);
 
-  // 編集確定
   const commitEdit = useCallback(() => {
     setIsEditing(false);
     const newLabel = editText.trim() || data.label;
@@ -69,20 +63,16 @@ export function MindMapNodeComponent({
     setEditText(newLabel);
   }, [editText, data.label, id, onLabelChange]);
 
-  // 編集キャンセル
   const cancelEdit = useCallback(() => {
     setIsEditing(false);
     setEditText(data.label);
   }, [data.label]);
 
-  // ダブルクリック → 編集モード（テキスト選択）
   const handleDoubleClick = useCallback(() => {
     setEditText(data.label);
     setIsEditing(true);
   }, [data.label]);
 
-  // 編集中のキー操作
-  // XMind風: Enter → 確定 + 兄弟追加、Tab → 確定 + 子追加
   const handleInputKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {
       switch (e.key) {
@@ -90,7 +80,6 @@ export function MindMapNodeComponent({
           e.preventDefault();
           e.stopPropagation();
           commitEdit();
-          // 確定と同時に兄弟ノード追加
           onAddSibling(id);
           break;
         case "Escape":
@@ -102,7 +91,6 @@ export function MindMapNodeComponent({
           e.preventDefault();
           e.stopPropagation();
           commitEdit();
-          // 確定と同時に子ノード追加
           onAddChild(id);
           break;
         default:
@@ -127,7 +115,6 @@ export function MindMapNodeComponent({
 
   return (
     <div className="relative group" onDoubleClick={handleDoubleClick}>
-      {/* 入力ハンドル（ルート以外） */}
       {!isRoot && (
         <Handle
           type="target"
@@ -136,9 +123,9 @@ export function MindMapNodeComponent({
         />
       )}
 
-      {/* ノード本体 */}
+      {/* ノード本体 — span が常にサイズを決定し、input は上に重ねる */}
       <div
-        className="px-4 py-2 rounded-xl shadow-md transition-all duration-200 min-w-[80px] max-w-[240px] text-center cursor-pointer"
+        className="relative px-4 py-2 rounded-xl shadow-md min-w-[80px] max-w-[240px] text-center cursor-pointer overflow-hidden"
         style={{
           backgroundColor: data.color,
           opacity: bgOpacity,
@@ -150,31 +137,38 @@ export function MindMapNodeComponent({
           fontWeight: isRoot ? 700 : data.depth === 1 ? 600 : 400,
         }}
       >
-        {isEditing ? (
+        {/* サイズ決定用のテキスト（常にレンダリング） */}
+        <span
+          className="whitespace-pre-wrap break-words select-none"
+          style={{ visibility: isEditing ? "hidden" : "visible" }}
+        >
+          {data.label || "\u00A0"}
+        </span>
+
+        {/* 編集用 input（絶対配置でspan の上に重ねる） */}
+        {isEditing && (
           <input
             ref={inputRef}
             value={editText}
             onChange={(e) => setEditText(e.target.value)}
             onBlur={handleInputBlur}
             onKeyDown={handleInputKeyDown}
-            className="bg-transparent outline-none text-center w-full"
-            style={{ color: textColor }}
+            className="absolute inset-0 bg-transparent outline-none text-center px-4 py-2 text-gray-900"
+            style={{
+              color: textColor,
+              fontSize: "inherit",
+              fontWeight: "inherit",
+            }}
           />
-        ) : (
-          <span className="select-none whitespace-pre-wrap break-words">
-            {data.label}
-          </span>
         )}
       </div>
 
-      {/* 出力ハンドル */}
       <Handle
         type="source"
         position={isHorizontal ? Position.Right : Position.Bottom}
         className="!w-0 !h-0 !border-0 !bg-transparent"
       />
 
-      {/* 子ノード追加ボタン（ホバー時に表示） */}
       {!data.collapsed && (
         <button
           onClick={handleAddChildClick}

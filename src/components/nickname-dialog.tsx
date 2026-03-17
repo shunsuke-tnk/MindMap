@@ -18,10 +18,12 @@ interface NicknameDialogProps {
 
 export function NicknameDialog({ onSubmit }: NicknameDialogProps) {
   const [name, setName] = useState("");
-  const [placeholder] = useState(getRandomName);
+  const [placeholder, setPlaceholder] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // クライアント側でのみランダム名を生成（ハイドレーション不一致を防ぐ）
   useEffect(() => {
+    setPlaceholder(getRandomName());
     inputRef.current?.focus();
   }, []);
 
