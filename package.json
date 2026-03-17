@@ -1,5 +1,5 @@
 {
-  "name": "mindmap-temp",
+  "name": "mindmap",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -9,12 +9,20 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@liveblocks/client": "^3.15.2",
+    "@liveblocks/node": "^3.15.2",
+    "@liveblocks/react": "^3.15.2",
+    "@xyflow/react": "^12.10.1",
+    "d3-flextree": "^2.1.2",
+    "d3-hierarchy": "^3.1.2",
     "next": "16.1.6",
     "react": "19.2.3",
     "react-dom": "19.2.3"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/d3-flextree": "^2.1.4",
+    "@types/d3-hierarchy": "^3.1.7",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
