@@ -294,7 +294,17 @@ export function MindMapCanvasLive({ direction, mode, onSelectionChange }: MindMa
       const allIdsToDelete = new Set<string>();
       for (const nodeId of nodeIds) {
         const node = storageNodes.get(nodeId);
-        if (!node || node.depth === 0) continue; // ルートは削除不可
+        if (!node) continue;
+        // 最初のルートノード（初期作成）は削除不可、追加ルートは削除可能
+        if (node.depth === 0) {
+          // ツリーエッジでソースになっている（子がある）初期ルートは保護
+          const hasChildren = edgesArr.some(
+            (e) => e.source === nodeId && (e.edgeType ?? "tree") === "tree"
+          );
+          const isOriginalRoot = storageNodes.size > 1 && hasChildren;
+          // ノードが1つしかない場合も削除不可
+          if (storageNodes.size <= 1 || isOriginalRoot) continue;
+        }
 
         // 対象ノードとその子孫すべてを収集
         const stack = [nodeId];

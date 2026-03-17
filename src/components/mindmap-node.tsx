@@ -115,10 +115,37 @@ export function MindMapNodeComponent({
 
   return (
     <div className="relative group" onDoubleClick={handleDoubleClick}>
+      {/* ツリー構造用ハンドル（メインの入出力） */}
       <Handle
         id="target"
         type="target"
         position={isHorizontal ? Position.Left : Position.Top}
+        className="!w-0 !h-0 !border-0 !bg-transparent"
+      />
+
+      {/* 関連線用ハンドル（4方向、ホバーで表示） */}
+      <Handle
+        id="top"
+        type="source"
+        position={Position.Top}
+        className="!w-3 !h-3 !bg-indigo-300 !border-2 !border-white opacity-0 group-hover:opacity-100 transition-opacity !z-20"
+      />
+      <Handle
+        id="bottom"
+        type="source"
+        position={Position.Bottom}
+        className="!w-3 !h-3 !bg-indigo-300 !border-2 !border-white opacity-0 group-hover:opacity-100 transition-opacity !z-20"
+      />
+      <Handle
+        id="left"
+        type="source"
+        position={Position.Left}
+        className="!w-3 !h-3 !bg-indigo-300 !border-2 !border-white opacity-0 group-hover:opacity-100 transition-opacity !z-20"
+      />
+      <Handle
+        id="right"
+        type="source"
+        position={Position.Right}
         className="!w-3 !h-3 !bg-indigo-300 !border-2 !border-white opacity-0 group-hover:opacity-100 transition-opacity !z-20"
       />
 
@@ -162,11 +189,12 @@ export function MindMapNodeComponent({
         )}
       </div>
 
+      {/* ツリー構造用ソースハンドル */}
       <Handle
         id="source"
         type="source"
         position={isHorizontal ? Position.Right : Position.Bottom}
-        className="!w-3 !h-3 !bg-indigo-300 !border-2 !border-white opacity-0 group-hover:opacity-100 transition-opacity !z-20"
+        className="!w-0 !h-0 !border-0 !bg-transparent"
       />
 
       {!data.collapsed && (

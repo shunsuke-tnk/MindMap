@@ -73,8 +73,8 @@ export function GroupOverlay({ selectedNodeIds }: GroupOverlayProps) {
 
           if (memberNodes.length === 0) return null;
 
-          const padding = 24;
-          const labelHeight = 22;
+          const padding = 8;
+          const labelHeight = 16;
           const minX = Math.min(...memberNodes.map((n) => n.x)) - padding;
           const minY =
             Math.min(...memberNodes.map((n) => n.y)) - padding - labelHeight;
@@ -94,16 +94,17 @@ export function GroupOverlay({ selectedNodeIds }: GroupOverlayProps) {
                 y={minY}
                 width={maxX - minX}
                 height={maxY - minY}
-                rx={16}
-                fill={bgColor}
+                rx={10}
+                fill="none"
                 stroke={borderColor}
                 strokeWidth={1.5}
+                strokeDasharray="6 4"
               />
               {data.label && (
                 <text
-                  x={minX + 12}
-                  y={minY + 15}
-                  fontSize={12}
+                  x={minX + 8}
+                  y={minY + 12}
+                  fontSize={10}
                   fill={borderColor.replace("0.35", "0.8")}
                   fontWeight={600}
                 >
