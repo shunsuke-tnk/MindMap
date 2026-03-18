@@ -117,6 +117,8 @@ function storageToReactFlow(
         id: data.id,
         source: data.source,
         target: data.target,
+        sourceHandle: "tree-source",
+        targetHandle: "tree-target",
         type: "mindmap",
         data: { color: data.color },
       });

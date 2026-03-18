@@ -75,4 +75,8 @@ export const {
   useSelf,
   useStatus,
   useRoom,
+  useUndo,
+  useRedo,
+  useCanUndo,
+  useCanRedo,
 } = createRoomContext<Presence, Storage>(client);
