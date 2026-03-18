@@ -4,15 +4,67 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useReactFlow } from "@xyflow/react";
 import type { LayoutDirection } from "@/types/mindmap";
 
+function FileMenu({ onSave, onLoad, onExportPdf }: { onSave?: () => void; onLoad?: () => void; onExportPdf?: () => void }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    if (isOpen) document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [isOpen]);
+
+  return (
+    <div className="relative" ref={menuRef}>
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="px-2 py-1 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded transition-colors"
+      >
+        ファイル
+      </button>
+      {isOpen && (
+        <div className="absolute top-full left-0 mt-1 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
+          <button
+            onClick={() => { onSave?.(); setIsOpen(false); }}
+            className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+          >
+            JSONで保存
+          </button>
+          <button
+            onClick={() => { onLoad?.(); setIsOpen(false); }}
+            className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+          >
+            JSONを読み込み
+          </button>
+          <div className="h-px bg-gray-100 my-1" />
+          <button
+            onClick={() => { onExportPdf?.(); setIsOpen(false); }}
+            className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+          >
+            PDFでエクスポート
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 interface ToolbarProps {
   direction: LayoutDirection;
   onDirectionChange: (direction: LayoutDirection) => void;
   onGroupSelected?: () => void;
   hasSelection?: boolean;
+  onSave?: () => void;
+  onLoad?: () => void;
+  onExportPdf?: () => void;
   children?: React.ReactNode;
 }
 
-export function Toolbar({ direction, onDirectionChange, onGroupSelected, hasSelection, children }: ToolbarProps) {
+export function Toolbar({ direction, onDirectionChange, onGroupSelected, hasSelection, onSave, onLoad, onExportPdf, children }: ToolbarProps) {
   const { zoomIn, zoomOut, fitView } = useReactFlow();
   const [copied, setCopied] = useState(false);
   const [mapName, setMapName] = useState("無題のマップ");
@@ -82,6 +134,7 @@ export function Toolbar({ direction, onDirectionChange, onGroupSelected, hasSele
             />
           </svg>
         </div>
+        <FileMenu onSave={onSave} onLoad={onLoad} onExportPdf={onExportPdf} />
         {isEditingName ? (
           <input
             ref={nameInputRef}

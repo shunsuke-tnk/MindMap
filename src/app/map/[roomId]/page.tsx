@@ -9,10 +9,12 @@ import { ModePanel, type CanvasMode } from "@/components/mode-panel";
 import { Cursors, ConnectionBadge } from "@/components/cursors";
 import { NicknameDialog } from "@/components/nickname-dialog";
 import { useGroupActions } from "@/components/group-overlay";
-import { RoomProvider, useUpdateMyPresence, useUndo, useRedo } from "@/lib/liveblocks";
+import { RoomProvider, useUpdateMyPresence, useUndo, useRedo, useStorage, useMutation } from "@/lib/liveblocks";
 import type { StorageNodeData, StorageEdgeData, StorageCommentData, StorageGroupData } from "@/lib/liveblocks";
 import type { LayoutDirection } from "@/types/mindmap";
 import { ROOT_COLOR } from "@/lib/colors";
+import { exportToPdf } from "@/lib/export";
+import { saveToFile, loadFromFile, type MindMapFileData } from "@/lib/save-load";
 
 function getInitialStorage() {
   const nodes = new LiveMap<string, LiveObject<StorageNodeData>>();
@@ -47,6 +49,97 @@ function RoomContent() {
   const { createGroup } = useGroupActions();
   const undo = useUndo();
   const redo = useRedo();
+  const storageNodes = useStorage((root) => root.nodes);
+  const storageEdges = useStorage((root) => root.edges);
+  const storageGroups = useStorage((root) => {
+    try { return root.groups; } catch { return null; }
+  });
+  const storageComments = useStorage((root) => {
+    try { return root.comments; } catch { return null; }
+  });
+  const storageMapName = useStorage((root) => {
+    try { return root.mapName; } catch { return null; }
+  });
+
+  // JSON保存
+  const handleSave = useCallback(() => {
+    if (!storageNodes || !storageEdges) return;
+    const nodes: Record<string, StorageNodeData> = {};
+    storageNodes.forEach((v: StorageNodeData, k: string) => { nodes[k] = v; });
+    const edges: Record<string, StorageEdgeData> = {};
+    storageEdges.forEach((v: StorageEdgeData, k: string) => { edges[k] = v; });
+    const groups: Record<string, StorageGroupData> = {};
+    if (storageGroups) storageGroups.forEach((v: StorageGroupData, k: string) => { groups[k] = v; });
+    const comments: Record<string, StorageCommentData> = {};
+    if (storageComments) storageComments.forEach((v: StorageCommentData, k: string) => { comments[k] = v; });
+
+    const data: MindMapFileData = {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      nodes, edges, groups, comments,
+      mapName: (storageMapName as { value: string } | null)?.value ?? "無題のマップ",
+    };
+    saveToFile(data, data.mapName);
+  }, [storageNodes, storageEdges, storageGroups, storageComments, storageMapName]);
+
+  // JSON読み込み
+  const loadFileData = useMutation(
+    ({ storage }, fileData: MindMapFileData) => {
+      const nodesMap = storage.get("nodes");
+      const edgesMap = storage.get("edges");
+
+      // 既存データをクリア
+      nodesMap.forEach((_: unknown, key: string) => nodesMap.delete(key));
+      edgesMap.forEach((_: unknown, key: string) => edgesMap.delete(key));
+
+      // ファイルのデータを復元
+      for (const [key, val] of Object.entries(fileData.nodes)) {
+        nodesMap.set(key, new LiveObject(val));
+      }
+      for (const [key, val] of Object.entries(fileData.edges)) {
+        edgesMap.set(key, new LiveObject(val));
+      }
+
+      // グループ復元
+      try {
+        const groupsMap = storage.get("groups");
+        groupsMap.forEach((_: unknown, key: string) => groupsMap.delete(key));
+        for (const [key, val] of Object.entries(fileData.groups ?? {})) {
+          groupsMap.set(key, new LiveObject(val));
+        }
+      } catch { /* groups未対応ルーム */ }
+
+      // コメント復元
+      try {
+        const commentsMap = storage.get("comments");
+        commentsMap.forEach((_: unknown, key: string) => commentsMap.delete(key));
+        for (const [key, val] of Object.entries(fileData.comments ?? {})) {
+          commentsMap.set(key, new LiveObject(val));
+        }
+      } catch { /* comments未対応ルーム */ }
+
+      // マップ名復元
+      try {
+        const mapName = storage.get("mapName");
+        mapName.set("value", fileData.mapName);
+      } catch { /* mapName未対応 */ }
+    },
+    []
+  );
+
+  const handleLoad = useCallback(async () => {
+    try {
+      const data = await loadFromFile();
+      loadFileData(data);
+    } catch (e) {
+      // ユーザーがキャンセルした場合は何もしない
+    }
+  }, [loadFileData]);
+
+  // PDFエクスポート
+  const handleExportPdf = useCallback(() => {
+    exportToPdf("mindmap");
+  }, []);
 
   const handleNicknameSubmit = useCallback(
     (name: string) => {
@@ -124,6 +217,9 @@ function RoomContent() {
           onDirectionChange={setDirection}
           onGroupSelected={handleGroupSelected}
           hasSelection={selectedCount >= 2}
+          onSave={handleSave}
+          onLoad={handleLoad}
+          onExportPdf={handleExportPdf}
         >
           <ConnectionBadge />
         </Toolbar>
