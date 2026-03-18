@@ -10,6 +10,7 @@ import {
   type OnConnect,
   ConnectionMode,
   SelectionMode,
+  PanOnScrollMode,
   MarkerType,
   Panel,
 } from "@xyflow/react";
@@ -363,26 +364,30 @@ export function MindMapCanvasLive({ direction, mode, onSelectionChange }: MindMa
       const edgesArr: StorageEdgeData[] = [];
       storageEdges.forEach((e: StorageEdgeData) => edgesArr.push(e));
 
-      const allIdsToDelete = new Set<string>();
+      const mindmapIdsToDelete = new Set<string>();
+      const commentIdsToDelete: string[] = [];
+
       for (const nodeId of nodeIds) {
+        // コメントノードの場合
+        if (nodeId.startsWith("comment-")) {
+          commentIdsToDelete.push(nodeId);
+          continue;
+        }
+
         const node = storageNodes.get(nodeId);
         if (!node) continue;
-        // 最初のルートノード（初期作成）は削除不可、追加ルートは削除可能
         if (node.depth === 0) {
-          // ツリーエッジでソースになっている（子がある）初期ルートは保護
           const hasChildren = edgesArr.some(
             (e) => e.source === nodeId && (e.edgeType ?? "tree") === "tree"
           );
           const isOriginalRoot = storageNodes.size > 1 && hasChildren;
-          // ノードが1つしかない場合も削除不可
           if (storageNodes.size <= 1 || isOriginalRoot) continue;
         }
 
-        // 対象ノードとその子孫すべてを収集
         const stack = [nodeId];
         while (stack.length > 0) {
           const current = stack.pop()!;
-          allIdsToDelete.add(current);
+          mindmapIdsToDelete.add(current);
           const children = edgesArr
             .filter((e) => e.source === current)
             .map((e) => e.target);
@@ -390,11 +395,14 @@ export function MindMapCanvasLive({ direction, mode, onSelectionChange }: MindMa
         }
       }
 
-      if (allIdsToDelete.size > 0) {
-        deleteNodesMutation(Array.from(allIdsToDelete));
+      if (mindmapIdsToDelete.size > 0) {
+        deleteNodesMutation(Array.from(mindmapIdsToDelete));
+      }
+      for (const id of commentIdsToDelete) {
+        handleCommentDelete(id);
       }
     },
-    [storageNodes, storageEdges]
+    [storageNodes, storageEdges, handleCommentDelete]
   );
 
   const deleteNodesMutation = useMutation(
@@ -697,6 +705,8 @@ export function MindMapCanvasLive({ direction, mode, onSelectionChange }: MindMa
           proOptions={{ hideAttribution: true }}
           deleteKeyCode={null}
           panOnDrag={mode === "hand"}
+          panOnScroll={mode === "pointer" || mode === "text"}
+          panOnScrollMode={PanOnScrollMode.Free}
           selectionOnDrag={mode === "pointer"}
           selectionMode={SelectionMode.Partial}
           nodesDraggable={mode === "pointer" || mode === "text"}
