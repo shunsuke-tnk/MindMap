@@ -62,7 +62,7 @@ type Storage = {
 };
 
 const client = createClient({
-  publicApiKey: process.env.NEXT_PUBLIC_LIVEBLOCKS_PUBLIC_KEY!,
+  authEndpoint: "/api/liveblocks-auth",
 });
 
 export const {
