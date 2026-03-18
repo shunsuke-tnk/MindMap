@@ -9,7 +9,7 @@ import { ModePanel, type CanvasMode } from "@/components/mode-panel";
 import { Cursors, ConnectionBadge } from "@/components/cursors";
 import { NicknameDialog } from "@/components/nickname-dialog";
 import { useGroupActions } from "@/components/group-overlay";
-import { RoomProvider, useUpdateMyPresence } from "@/lib/liveblocks";
+import { RoomProvider, useUpdateMyPresence, useUndo, useRedo } from "@/lib/liveblocks";
 import type { StorageNodeData, StorageEdgeData, StorageCommentData, StorageGroupData } from "@/lib/liveblocks";
 import type { LayoutDirection } from "@/types/mindmap";
 import { ROOT_COLOR } from "@/lib/colors";
@@ -45,6 +45,8 @@ function RoomContent() {
   const selectedIdsRef = useRef<string[]>([]);
   const updatePresence = useUpdateMyPresence();
   const { createGroup } = useGroupActions();
+  const undo = useUndo();
+  const redo = useRedo();
 
   const handleNicknameSubmit = useCallback(
     (name: string) => {
@@ -81,10 +83,23 @@ function RoomContent() {
           createGroup(ids, "");
         }
       }
+      // Cmd+Z → Undo
+      if (e.key === "z" && (e.ctrlKey || e.metaKey) && !e.shiftKey) {
+        e.preventDefault();
+        undo();
+      }
+      // Cmd+Y or Cmd+Shift+Z → Redo
+      if (
+        (e.key === "y" && (e.ctrlKey || e.metaKey)) ||
+        (e.key === "z" && (e.ctrlKey || e.metaKey) && e.shiftKey)
+      ) {
+        e.preventDefault();
+        redo();
+      }
     };
     window.addEventListener("keydown", handleGlobalKeyDown);
     return () => window.removeEventListener("keydown", handleGlobalKeyDown);
-  }, [createGroup]);
+  }, [createGroup, undo, redo]);
 
   const handleSelectionUpdate = useCallback((ids: string[]) => {
     selectedIdsRef.current = ids;

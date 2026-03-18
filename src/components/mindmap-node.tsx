@@ -115,39 +115,31 @@ export function MindMapNodeComponent({
 
   return (
     <div className="relative group" onDoubleClick={handleDoubleClick}>
-      {/* ツリー構造用ハンドル（メインの入出力） */}
+      {/* ツリー構造用ハンドル（透明、エッジ接続用） */}
       <Handle
-        id="target"
+        id="tree-target"
         type="target"
         position={isHorizontal ? Position.Left : Position.Top}
         className="!w-0 !h-0 !border-0 !bg-transparent"
       />
 
-      {/* 関連線用ハンドル（4方向、ホバーで表示） */}
-      <Handle
-        id="top"
-        type="source"
-        position={Position.Top}
-        className="!w-3 !h-3 !bg-indigo-300 !border-2 !border-white opacity-0 group-hover:opacity-100 transition-opacity !z-20"
-      />
-      <Handle
-        id="bottom"
-        type="source"
-        position={Position.Bottom}
-        className="!w-3 !h-3 !bg-indigo-300 !border-2 !border-white opacity-0 group-hover:opacity-100 transition-opacity !z-20"
-      />
-      <Handle
-        id="left"
-        type="source"
-        position={Position.Left}
-        className="!w-3 !h-3 !bg-indigo-300 !border-2 !border-white opacity-0 group-hover:opacity-100 transition-opacity !z-20"
-      />
-      <Handle
-        id="right"
-        type="source"
-        position={Position.Right}
-        className="!w-3 !h-3 !bg-indigo-300 !border-2 !border-white opacity-0 group-hover:opacity-100 transition-opacity !z-20"
-      />
+      {/* 関連線用ハンドル（4方向、ホバーで表示、source+target 両方） */}
+      <Handle id="rel-top-src" type="source" position={Position.Top}
+        className="!w-3 !h-3 !bg-indigo-300 !border-2 !border-white opacity-0 group-hover:opacity-100 transition-opacity !z-20" />
+      <Handle id="rel-top-tgt" type="target" position={Position.Top}
+        className="!w-3 !h-3 !bg-indigo-300 !border-2 !border-white opacity-0 group-hover:opacity-100 transition-opacity !z-20" style={{ left: "calc(50% + 8px)" }} />
+      <Handle id="rel-bottom-src" type="source" position={Position.Bottom}
+        className="!w-3 !h-3 !bg-indigo-300 !border-2 !border-white opacity-0 group-hover:opacity-100 transition-opacity !z-20" />
+      <Handle id="rel-bottom-tgt" type="target" position={Position.Bottom}
+        className="!w-3 !h-3 !bg-indigo-300 !border-2 !border-white opacity-0 group-hover:opacity-100 transition-opacity !z-20" style={{ left: "calc(50% + 8px)" }} />
+      <Handle id="rel-left-src" type="source" position={Position.Left}
+        className="!w-3 !h-3 !bg-indigo-300 !border-2 !border-white opacity-0 group-hover:opacity-100 transition-opacity !z-20" />
+      <Handle id="rel-left-tgt" type="target" position={Position.Left}
+        className="!w-3 !h-3 !bg-indigo-300 !border-2 !border-white opacity-0 group-hover:opacity-100 transition-opacity !z-20" style={{ top: "calc(50% + 8px)" }} />
+      <Handle id="rel-right-src" type="source" position={Position.Right}
+        className="!w-3 !h-3 !bg-indigo-300 !border-2 !border-white opacity-0 group-hover:opacity-100 transition-opacity !z-20" />
+      <Handle id="rel-right-tgt" type="target" position={Position.Right}
+        className="!w-3 !h-3 !bg-indigo-300 !border-2 !border-white opacity-0 group-hover:opacity-100 transition-opacity !z-20" style={{ top: "calc(50% + 8px)" }} />
 
       {/* ノード本体 — span が常にサイズを決定し、input は上に重ねる */}
       <div
@@ -191,7 +183,7 @@ export function MindMapNodeComponent({
 
       {/* ツリー構造用ソースハンドル */}
       <Handle
-        id="source"
+        id="tree-source"
         type="source"
         position={isHorizontal ? Position.Right : Position.Bottom}
         className="!w-0 !h-0 !border-0 !bg-transparent"
