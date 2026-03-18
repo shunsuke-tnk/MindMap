@@ -36,6 +36,15 @@ yarn-error.log*
 # vercel
 .vercel
 
+# Claude Code ローカル設定
+.claude/settings.local.json
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Playwright MCP
+.playwright-mcp/
+
+# screenshots（開発時の確認用）
+screenshots/
