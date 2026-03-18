@@ -15,6 +15,8 @@ import type { LayoutDirection } from "@/types/mindmap";
 import { ROOT_COLOR } from "@/lib/colors";
 import { exportToPdf } from "@/lib/export";
 import { saveToFile, loadFromFile, type MindMapFileData } from "@/lib/save-load";
+import { MapSidebar } from "@/components/map-sidebar";
+import { saveMapVisit } from "@/lib/map-history";
 
 function getInitialStorage() {
   const nodes = new LiveMap<string, LiveObject<StorageNodeData>>();
@@ -39,11 +41,12 @@ function getInitialStorage() {
   return { nodes, edges, comments, groups, mapName };
 }
 
-function RoomContent() {
+function RoomContent({ roomId }: { roomId: string }) {
   const [direction, setDirection] = useState<LayoutDirection>("horizontal");
   const [mode, setMode] = useState<CanvasMode>("pointer");
   const [nickname, setNickname] = useState<string | null>(null);
   const [selectedCount, setSelectedCount] = useState(0);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const selectedIdsRef = useRef<string[]>([]);
   const updatePresence = useUpdateMyPresence();
   const { createGroup } = useGroupActions();
@@ -145,8 +148,9 @@ function RoomContent() {
     (name: string) => {
       setNickname(name);
       updatePresence({ nickname: name });
+      saveMapVisit(roomId, "無題のマップ");
     },
-    [updatePresence]
+    [updatePresence, roomId]
   );
 
   // グローバルキーボードショートカット（H/V でモード切替）
@@ -223,7 +227,12 @@ function RoomContent() {
         >
           <ConnectionBadge />
         </Toolbar>
-        <div className="flex-1 relative">
+        <div className="flex-1 relative overflow-hidden">
+          <MapSidebar
+            currentRoomId={roomId}
+            isOpen={sidebarOpen}
+            onToggle={() => setSidebarOpen(!sidebarOpen)}
+          />
           <ModePanel mode={mode} onModeChange={setMode} />
           <MindMapCanvasLive
             direction={direction}
@@ -254,7 +263,7 @@ export default function MapPage({
       }}
       initialStorage={getInitialStorage}
     >
-      <RoomContent />
+      <RoomContent roomId={roomId} />
     </RoomProvider>
   );
 }
