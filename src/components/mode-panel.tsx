@@ -1,6 +1,6 @@
 "use client";
 
-export type CanvasMode = "pointer" | "hand";
+export type CanvasMode = "pointer" | "hand" | "text";
 
 interface ModePanelProps {
   mode: CanvasMode;
@@ -62,6 +62,35 @@ export function ModePanel({ mode, onModeChange }: ModePanelProps) {
           <path d="M14 10V4a2 2 0 0 0-2-2a2 2 0 0 0-2 2v2" />
           <path d="M10 10.5V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2v8" />
           <path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15" />
+        </svg>
+      </button>
+
+      {/* 区切り線 */}
+      <div className="h-px bg-gray-200" />
+
+      {/* テキストモード */}
+      <button
+        onClick={() => onModeChange("text")}
+        className={`p-2 transition-colors ${
+          mode === "text"
+            ? "bg-indigo-50 text-indigo-600"
+            : "text-gray-400 hover:text-gray-600 hover:bg-gray-50"
+        }`}
+        title="テキストモード (T)"
+      >
+        <svg
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <polyline points="4 7 4 4 20 4 20 7" />
+          <line x1="9" y1="20" x2="15" y2="20" />
+          <line x1="12" y1="4" x2="12" y2="20" />
         </svg>
       </button>
     </div>

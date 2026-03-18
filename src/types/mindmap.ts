@@ -10,7 +10,7 @@ export interface MindMapNodeData {
 }
 
 // React Flow のノード型
-export type MindMapNode = Node<MindMapNodeData, "mindmap">;
+export type MindMapNode = Node<MindMapNodeData>;
 
 // React Flow のエッジ型
 export type MindMapEdge = Edge;

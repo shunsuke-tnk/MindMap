@@ -33,6 +33,17 @@ type Presence = {
   nickname: string;
 };
 
+// テキストコメントデータ
+export type StorageCommentData = {
+  id: string;
+  text: string;
+  posX: number;
+  posY: number;
+  color: string;
+  bold: boolean;
+  fontSize: "sm" | "md" | "lg";
+};
+
 // グループデータ
 export type StorageGroupData = {
   id: string;
@@ -45,6 +56,7 @@ export type StorageGroupData = {
 type Storage = {
   nodes: LiveMap<string, LiveObject<StorageNodeData>>;
   edges: LiveMap<string, LiveObject<StorageEdgeData>>;
+  comments: LiveMap<string, LiveObject<StorageCommentData>>;
   groups: LiveMap<string, LiveObject<StorageGroupData>>;
   mapName: LiveObject<{ value: string }>;
 };

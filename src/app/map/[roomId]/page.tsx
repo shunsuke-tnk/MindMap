@@ -10,7 +10,7 @@ import { Cursors, ConnectionBadge } from "@/components/cursors";
 import { NicknameDialog } from "@/components/nickname-dialog";
 import { useGroupActions } from "@/components/group-overlay";
 import { RoomProvider, useUpdateMyPresence } from "@/lib/liveblocks";
-import type { StorageNodeData, StorageEdgeData, StorageGroupData } from "@/lib/liveblocks";
+import type { StorageNodeData, StorageEdgeData, StorageCommentData, StorageGroupData } from "@/lib/liveblocks";
 import type { LayoutDirection } from "@/types/mindmap";
 import { ROOT_COLOR } from "@/lib/colors";
 
@@ -30,10 +30,11 @@ function getInitialStorage() {
   );
 
   const edges = new LiveMap<string, LiveObject<StorageEdgeData>>();
+  const comments = new LiveMap<string, LiveObject<StorageCommentData>>();
   const groups = new LiveMap<string, LiveObject<StorageGroupData>>();
   const mapName = new LiveObject({ value: "無題のマップ" });
 
-  return { nodes, edges, groups, mapName };
+  return { nodes, edges, comments, groups, mapName };
 }
 
 function RoomContent() {
@@ -68,6 +69,9 @@ function RoomContent() {
       }
       if (e.key === "v" || e.key === "V") {
         setMode("pointer");
+      }
+      if (e.key === "t" || e.key === "T") {
+        setMode("text");
       }
       // Ctrl+] or Cmd+] → グループ化
       if (e.key === "]" && (e.ctrlKey || e.metaKey)) {

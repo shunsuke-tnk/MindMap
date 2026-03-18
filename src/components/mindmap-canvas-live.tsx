@@ -24,6 +24,7 @@ import type {
 import { MindMapNodeComponent } from "@/components/mindmap-node";
 import { MindMapEdgeComponent } from "@/components/mindmap-edge";
 import { RelationEdgeComponent } from "@/components/relation-edge";
+import { CommentNodeComponent } from "@/components/comment-node";
 import { GroupOverlay } from "@/components/group-overlay";
 import { MindMapProvider } from "@/lib/mindmap-context";
 import { useMindMapLayout } from "@/hooks/use-mindmap-layout";
@@ -35,9 +36,13 @@ import {
   useUpdateMyPresence,
   type StorageNodeData,
   type StorageEdgeData,
+  type StorageCommentData,
 } from "@/lib/liveblocks";
 
-const nodeTypes = { mindmap: MindMapNodeComponent };
+const nodeTypes = {
+  mindmap: MindMapNodeComponent,
+  comment: CommentNodeComponent,
+};
 const edgeTypes: EdgeTypes = {
   mindmap: MindMapEdgeComponent,
   relation: RelationEdgeComponent,
@@ -130,6 +135,7 @@ interface MindMapCanvasLiveProps {
 export function MindMapCanvasLive({ direction, mode, onSelectionChange }: MindMapCanvasLiveProps) {
   const storageNodes = useStorage((root) => root.nodes);
   const storageEdges = useStorage((root) => root.edges);
+  const storageComments = useStorage((root) => root.comments);
   const updatePresence = useUpdateMyPresence();
 
   const [nodes, setNodes, onNodesChange] = useNodesState<MindMapNode>([]);
@@ -147,6 +153,40 @@ export function MindMapCanvasLive({ direction, mode, onSelectionChange }: MindMa
     ((nodeId: string, trigger: "select" | "overwrite") => void) | null
   >(null);
 
+  // コメントテキスト変更
+  const handleCommentChange = useMutation(
+    ({ storage }, commentId: string, text: string) => {
+      const commentsMap = storage.get("comments");
+      const comment = commentsMap.get(commentId);
+      if (comment) {
+        comment.set("text", text);
+      }
+    },
+    []
+  );
+
+  // コメント削除
+  const handleCommentDelete = useMutation(
+    ({ storage }, commentId: string) => {
+      const commentsMap = storage.get("comments");
+      commentsMap.delete(commentId);
+    },
+    []
+  );
+
+  // コメントスタイル変更（太字・色・サイズ）
+  const handleCommentStyleChange = useMutation(
+    ({ storage }, commentId: string, style: Partial<{ bold: boolean; color: string; fontSize: "sm" | "md" | "lg" }>) => {
+      const commentsMap = storage.get("comments");
+      const comment = commentsMap.get(commentId);
+      if (!comment) return;
+      if (style.bold !== undefined) comment.set("bold", style.bold);
+      if (style.color !== undefined) comment.set("color", style.color);
+      if (style.fontSize !== undefined) comment.set("fontSize", style.fontSize);
+    },
+    []
+  );
+
   // Storage が変更されたらレイアウト再計算
   useEffect(() => {
     if (!storageNodes || !storageEdges) return;
@@ -154,6 +194,7 @@ export function MindMapCanvasLive({ direction, mode, onSelectionChange }: MindMa
     const key = JSON.stringify({
       nodes: Array.from(storageNodes.entries()),
       edges: Array.from(storageEdges.entries()),
+      comments: storageComments ? Array.from(storageComments.entries()) : [],
     });
     if (key === prevStorageRef.current) return;
     prevStorageRef.current = key;
@@ -164,16 +205,43 @@ export function MindMapCanvasLive({ direction, mode, onSelectionChange }: MindMa
     );
     const { nodes: layoutNodes } = calculateLayout(rfNodes, rfEdges, direction);
 
+    // コメントノードを追加
+    const commentNodes: MindMapNode[] = [];
+    if (storageComments) {
+      storageComments.forEach((data: StorageCommentData) => {
+        commentNodes.push({
+          id: data.id,
+          type: "comment",
+          position: { x: data.posX, y: data.posY },
+          data: {
+            text: data.text,
+            color: data.color,
+            bold: data.bold,
+            fontSize: data.fontSize,
+            onCommentChange: handleCommentChange,
+            onCommentDelete: handleCommentDelete,
+            onStyleChange: handleCommentStyleChange,
+            label: data.text,
+            depth: -1,
+            collapsed: false,
+          },
+          draggable: true,
+        });
+      });
+    }
+
+    const allNodes = [...layoutNodes, ...commentNodes];
+
     // 追加直後のノードがあれば、それを選択状態にする
     const pendingId = pendingEditNodeRef.current;
     if (pendingId) {
-      const updated = layoutNodes.map((n) => ({
+      const updated = allNodes.map((n) => ({
         ...n,
         selected: n.id === pendingId,
       }));
       setNodes(updated);
     } else {
-      setNodes(layoutNodes);
+      setNodes(allNodes);
     }
     setEdges(rfEdges);
 
@@ -186,7 +254,7 @@ export function MindMapCanvasLive({ direction, mode, onSelectionChange }: MindMa
         pendingEditNodeRef.current = null;
       }
     }, 120);
-  }, [storageNodes, storageEdges, direction, calculateLayout, setNodes, setEdges, fitView]);
+  }, [storageNodes, storageEdges, storageComments, direction, calculateLayout, setNodes, setEdges, fitView, handleCommentChange, handleCommentDelete, handleCommentStyleChange]);
 
   // ラベル変更
   const handleLabelChange = useMutation(
@@ -502,12 +570,69 @@ export function MindMapCanvasLive({ direction, mode, onSelectionChange }: MindMa
     []
   );
 
+  // コメントノードのドラッグ終了時に位置を保存
+  const updateCommentPosition = useMutation(
+    ({ storage }, commentId: string, posX: number, posY: number) => {
+      const commentsMap = storage.get("comments");
+      const comment = commentsMap.get(commentId);
+      if (comment) {
+        comment.set("posX", posX);
+        comment.set("posY", posY);
+      }
+    },
+    []
+  );
+
+  const handleNodeDragStop = useCallback(
+    (_: React.MouseEvent, node: MindMapNode) => {
+      if (node.type === "comment") {
+        updateCommentPosition(node.id, node.position.x, node.position.y);
+      }
+    },
+    [updateCommentPosition]
+  );
+
+  // コメント追加
+  const addComment = useMutation(
+    ({ storage }, posX: number, posY: number) => {
+      const commentsMap = storage.get("comments");
+      const commentId = `comment-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+      commentsMap.set(
+        commentId,
+        new LiveObject<StorageCommentData>({
+          id: commentId,
+          text: "",
+          posX,
+          posY,
+          color: "#374151",
+          bold: false,
+          fontSize: "md",
+        })
+      );
+      return commentId;
+    },
+    []
+  );
+
   // ペーンのダブルクリック検知（onPaneClick ベース）
   const lastPaneClickRef = useRef<{ time: number; x: number; y: number }>({ time: 0, x: 0, y: 0 });
 
   const handlePaneClick = useCallback(
     (event: React.MouseEvent) => {
+      const position = reactFlowInstance.screenToFlowPosition({
+        x: event.clientX,
+        y: event.clientY,
+      });
+
+      // テキストモード: シングルクリックでコメント追加
+      if (mode === "text") {
+        addComment(position.x, position.y);
+        return;
+      }
+
       if (mode !== "pointer") return;
+
+      // ポインターモード: ダブルクリックで独立ノード追加
       const now = Date.now();
       const last = lastPaneClickRef.current;
       const isDoubleClick =
@@ -519,17 +644,12 @@ export function MindMapCanvasLive({ direction, mode, onSelectionChange }: MindMa
 
       if (!isDoubleClick) return;
 
-      // ダブルクリック確定 → 独立ノード作成
-      const position = reactFlowInstance.screenToFlowPosition({
-        x: event.clientX,
-        y: event.clientY,
-      });
       const newId = addIndependentNode(position.x, position.y);
       if (newId) {
         pendingEditNodeRef.current = newId;
       }
     },
-    [mode, addIndependentNode, reactFlowInstance]
+    [mode, addIndependentNode, addComment, reactFlowInstance]
   );
 
   if (!storageNodes || !storageEdges) {
@@ -549,7 +669,7 @@ export function MindMapCanvasLive({ direction, mode, onSelectionChange }: MindMa
       requestEditRef={requestEditRef}
     >
       <div
-        className={`w-full h-full ${mode === "hand" ? "cursor-grab active:cursor-grabbing" : ""}`}
+        className={`w-full h-full ${mode === "hand" ? "cursor-grab active:cursor-grabbing" : mode === "text" ? "cursor-text" : ""}`}
         onKeyDown={handleKeyDown}
         onMouseMove={handleMouseMove}
         onMouseLeave={handleMouseLeave}
@@ -561,6 +681,7 @@ export function MindMapCanvasLive({ direction, mode, onSelectionChange }: MindMa
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
+          onNodeDragStop={handleNodeDragStop}
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes}
           defaultEdgeOptions={{ type: "mindmap" }}
@@ -574,15 +695,15 @@ export function MindMapCanvasLive({ direction, mode, onSelectionChange }: MindMa
           panOnDrag={mode === "hand"}
           selectionOnDrag={mode === "pointer"}
           selectionMode={SelectionMode.Partial}
-          nodesDraggable={mode === "pointer"}
-          elementsSelectable={mode === "pointer"}
+          nodesDraggable={mode === "pointer" || mode === "text"}
+          elementsSelectable={mode === "pointer" || mode === "text"}
           nodesConnectable={mode === "pointer"}
           onPaneClick={handlePaneClick}
         >
           <GroupOverlay selectedNodeIds={nodes.filter((n) => n.selected).map((n) => n.id)} />
           <Panel position="bottom-center" className="text-xs text-gray-400">
-            Enter: 兄弟追加 | Tab: 子追加 | Delete: 削除 | Ctrl+L:
-            関連線 | Ctrl+]: グループ
+            Enter: 兄弟追加 | Tab: 子追加 | Delete: 削除 | T:
+            テキスト | H: ハンド | V: ポインター
           </Panel>
         </ReactFlow>
       </div>
