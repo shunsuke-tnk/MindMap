@@ -135,7 +135,9 @@ interface MindMapCanvasLiveProps {
 export function MindMapCanvasLive({ direction, mode, onSelectionChange }: MindMapCanvasLiveProps) {
   const storageNodes = useStorage((root) => root.nodes);
   const storageEdges = useStorage((root) => root.edges);
-  const storageComments = useStorage((root) => root.comments);
+  const storageComments = useStorage((root) => {
+    try { return root.comments; } catch { return null; }
+  });
   const updatePresence = useUpdateMyPresence();
 
   const [nodes, setNodes, onNodesChange] = useNodesState<MindMapNode>([]);
@@ -194,7 +196,7 @@ export function MindMapCanvasLive({ direction, mode, onSelectionChange }: MindMa
     const key = JSON.stringify({
       nodes: Array.from(storageNodes.entries()),
       edges: Array.from(storageEdges.entries()),
-      comments: storageComments ? Array.from(storageComments.entries()) : [],
+      comments: storageComments ? Array.from(storageComments.entries()) : "none",
     });
     if (key === prevStorageRef.current) return;
     prevStorageRef.current = key;
