@@ -108,6 +108,8 @@ function storageToReactFlow(
         id: data.id,
         source: data.source,
         target: data.target,
+        sourceHandle: data.sourceHandle,
+        targetHandle: data.targetHandle,
         type: "relation",
         data: { color: data.color },
         animated: true,
@@ -150,6 +152,7 @@ export function MindMapCanvasLive({ direction, mode, onSelectionChange }: MindMa
   const { calculateLayout } = useMindMapLayout();
   const layoutTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevStorageRef = useRef<string>("");
+  const prevNodeCountRef = useRef<number>(0);
 
   // 追加直後に編集モードに入るノードID を保持する ref
   const pendingEditNodeRef = useRef<string | null>(null);
@@ -208,7 +211,21 @@ export function MindMapCanvasLive({ direction, mode, onSelectionChange }: MindMa
       storageNodes,
       storageEdges
     );
-    const { nodes: layoutNodes } = calculateLayout(rfNodes, rfEdges, direction);
+
+    // ノード数が増えた（追加）or 初回のみレイアウト再計算
+    // ラベル変更やドラッグ移動では Storage の posX/posY をそのまま使う
+    const currentNodeCount = storageNodes.size;
+    const prevCount = prevNodeCountRef.current;
+    const isNodeAdded = currentNodeCount > prevCount;
+    prevNodeCountRef.current = currentNodeCount;
+
+    let layoutNodes: MindMapNode[];
+    if (isNodeAdded || prevCount === 0) {
+      const result = calculateLayout(rfNodes, rfEdges, direction);
+      layoutNodes = result.nodes;
+    } else {
+      layoutNodes = rfNodes;
+    }
 
     // コメントノードを追加
     const commentNodes: MindMapNode[] = [];
@@ -251,14 +268,19 @@ export function MindMapCanvasLive({ direction, mode, onSelectionChange }: MindMa
     setEdges(rfEdges);
 
     if (layoutTimeoutRef.current) clearTimeout(layoutTimeoutRef.current);
-    layoutTimeoutRef.current = setTimeout(() => {
-      fitView({ padding: 0.3 });
-      // レイアウト確定後に編集モードに入る
-      if (pendingId && requestEditRef.current) {
-        requestEditRef.current(pendingId, "overwrite");
-        pendingEditNodeRef.current = null;
-      }
-    }, 120);
+    if (isNodeAdded || prevCount === 0) {
+      layoutTimeoutRef.current = setTimeout(() => {
+        fitView({ padding: 0.3 });
+        // レイアウト確定後に編集モードに入る
+        if (pendingId && requestEditRef.current) {
+          requestEditRef.current(pendingId, "overwrite");
+          pendingEditNodeRef.current = null;
+        }
+      }, 120);
+    } else if (pendingId && requestEditRef.current) {
+      requestEditRef.current(pendingId, "overwrite");
+      pendingEditNodeRef.current = null;
+    }
   }, [storageNodes, storageEdges, storageComments, direction, calculateLayout, setNodes, setEdges, fitView, handleCommentChange, handleCommentDelete, handleCommentStyleChange]);
 
   // ラベル変更
@@ -526,7 +548,7 @@ export function MindMapCanvasLive({ direction, mode, onSelectionChange }: MindMa
 
   // 関連線（矢印）の接続ハンドラ
   const addRelationEdge = useMutation(
-    ({ storage }, sourceId: string, targetId: string) => {
+    ({ storage }, sourceId: string, targetId: string, srcHandle?: string, tgtHandle?: string) => {
       const edgesMap = storage.get("edges");
       const edgeId = `relation-${sourceId}-${targetId}-${Date.now()}`;
       edgesMap.set(
@@ -537,6 +559,8 @@ export function MindMapCanvasLive({ direction, mode, onSelectionChange }: MindMa
           target: targetId,
           color: "#94A3B8",
           edgeType: "relation",
+          sourceHandle: srcHandle,
+          targetHandle: tgtHandle,
         })
       );
     },
@@ -546,7 +570,12 @@ export function MindMapCanvasLive({ direction, mode, onSelectionChange }: MindMa
   const onConnect: OnConnect = useCallback(
     (params) => {
       if (params.source && params.target && params.source !== params.target) {
-        addRelationEdge(params.source, params.target);
+        addRelationEdge(
+          params.source,
+          params.target,
+          params.sourceHandle ?? undefined,
+          params.targetHandle ?? undefined
+        );
       }
     },
     [addRelationEdge]
@@ -582,6 +611,19 @@ export function MindMapCanvasLive({ direction, mode, onSelectionChange }: MindMa
     []
   );
 
+  // マインドマップノードのドラッグ終了時に位置を保存
+  const updateNodePosition = useMutation(
+    ({ storage }, nodeId: string, posX: number, posY: number) => {
+      const nodesMap = storage.get("nodes");
+      const node = nodesMap.get(nodeId);
+      if (node) {
+        node.set("posX", posX);
+        node.set("posY", posY);
+      }
+    },
+    []
+  );
+
   // コメントノードのドラッグ終了時に位置を保存
   const updateCommentPosition = useMutation(
     ({ storage }, commentId: string, posX: number, posY: number) => {
@@ -599,9 +641,11 @@ export function MindMapCanvasLive({ direction, mode, onSelectionChange }: MindMa
     (_: React.MouseEvent, node: MindMapNode) => {
       if (node.type === "comment") {
         updateCommentPosition(node.id, node.position.x, node.position.y);
+      } else {
+        updateNodePosition(node.id, node.position.x, node.position.y);
       }
     },
-    [updateCommentPosition]
+    [updateCommentPosition, updateNodePosition]
   );
 
   // コメント追加

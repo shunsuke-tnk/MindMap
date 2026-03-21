@@ -27,16 +27,20 @@ export function getNodeColor(depth: number, branchIndex: number): string {
   return baseColor;
 }
 
-// ノードの背景色（depth に応じて薄くする）
-export function getNodeBgOpacity(depth: number): number {
-  if (depth === 0) return 1;
-  if (depth === 1) return 0.9;
-  if (depth === 2) return 0.7;
-  return 0.5;
+// ノードの背景色（depth に応じてアルファ値で薄くする）
+// opacity をノード全体に適用するとテキストも薄くなるため、背景色自体に透明度を含める
+export function getNodeBgColor(color: string, depth: number): string {
+  if (depth === 0) return color;
+  const r = parseInt(color.slice(1, 3), 16);
+  const g = parseInt(color.slice(3, 5), 16);
+  const b = parseInt(color.slice(5, 7), 16);
+  if (depth === 1) return `rgba(${r}, ${g}, ${b}, 0.9)`;
+  if (depth === 2) return `rgba(${r}, ${g}, ${b}, 0.7)`;
+  return `rgba(${r}, ${g}, ${b}, 0.55)`;
 }
 
 // テキストカラー（背景色に対するコントラスト）
 export function getTextColor(depth: number): string {
   if (depth <= 1) return "#FFFFFF";
-  return "#1F2937"; // gray-800
+  return "#111827"; // gray-900
 }
