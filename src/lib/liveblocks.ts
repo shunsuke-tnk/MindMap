@@ -24,6 +24,8 @@ export type StorageEdgeData = {
   color: string;
   // "tree" = 親子関係（マインドマップ構造）、"relation" = 関連線（矢印付き曲線）
   edgeType: "tree" | "relation";
+  sourceHandle?: string;
+  targetHandle?: string;
 };
 
 // プレゼンス（カーソル位置・選択中ノード）

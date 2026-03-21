@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import type { MindMapNode } from "@/types/mindmap";
-import { getNodeBgOpacity, getTextColor } from "@/lib/colors";
+import { getNodeBgColor, getTextColor } from "@/lib/colors";
 import { useMindMapContext } from "@/lib/mindmap-context";
 
 export function MindMapNodeComponent({
@@ -19,7 +19,7 @@ export function MindMapNodeComponent({
   const [editText, setEditText] = useState(data.label);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const bgOpacity = getNodeBgOpacity(data.depth);
+  const bgColor = getNodeBgColor(data.color, data.depth);
   const textColor = getTextColor(data.depth);
   const isRoot = data.depth === 0;
 
@@ -75,6 +75,8 @@ export function MindMapNodeComponent({
 
   const handleInputKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {
+      // IME変換中はEnter/Tabを無視（変換確定のみ処理させる）
+      if (e.nativeEvent.isComposing || e.keyCode === 229) return;
       switch (e.key) {
         case "Enter":
           e.preventDefault();
@@ -145,8 +147,7 @@ export function MindMapNodeComponent({
       <div
         className="relative px-4 py-2 rounded-xl shadow-md min-w-[80px] max-w-[240px] text-center cursor-pointer overflow-hidden"
         style={{
-          backgroundColor: data.color,
-          opacity: bgOpacity,
+          backgroundColor: bgColor,
           color: textColor,
           borderWidth: selected ? 3 : 1,
           borderColor: selected ? "#1D4ED8" : "transparent",
