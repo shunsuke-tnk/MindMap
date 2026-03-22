@@ -115,11 +115,12 @@ export function useMindMapLayout() {
           nodeSize: (node) => {
             const d = node.data;
             if (isHorizontal) {
-              return [d.height + 20, d.width + 60];
+              // [垂直方向の間隔, 水平方向の間隔]
+              return [d.height + 30, d.width + 100];
             }
-            return [d.width + 40, d.height + 50];
+            return [d.width + 50, d.height + 60];
           },
-          spacing: 10,
+          spacing: 16,
         });
 
         const root = hierarchy(tree);
