@@ -18,6 +18,7 @@ export function MindMapNodeComponent({
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState(data.label);
   const inputRef = useRef<HTMLInputElement>(null);
+  const justComposedRef = useRef(false);
 
   const bgColor = getNodeBgColor(data.color, data.depth);
   const textColor = getTextColor(data.depth);
@@ -75,8 +76,15 @@ export function MindMapNodeComponent({
 
   const handleInputKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {
-      // IME変換中はEnter/Tabを無視（変換確定のみ処理させる）
+      // IME変換中はEnter/Tabを無視
       if (e.nativeEvent.isComposing || e.keyCode === 229) return;
+      // Chrome: compositionend が keydown より先に発火するため、
+      // 変換確定直後の Enter/Tab は justComposedRef で無視する
+      if ((e.key === "Enter" || e.key === "Tab") && justComposedRef.current) {
+        justComposedRef.current = false;
+        return;
+      }
+      justComposedRef.current = false;
       switch (e.key) {
         case "Enter":
           e.preventDefault();
@@ -172,6 +180,7 @@ export function MindMapNodeComponent({
             onChange={(e) => setEditText(e.target.value)}
             onBlur={handleInputBlur}
             onKeyDown={handleInputKeyDown}
+            onCompositionEnd={() => { justComposedRef.current = true; }}
             className="absolute inset-0 bg-transparent outline-none text-center px-4 py-2 text-gray-900"
             style={{
               color: textColor,
