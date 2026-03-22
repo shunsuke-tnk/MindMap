@@ -487,6 +487,20 @@ export function MindMapCanvasLive({ direction, mode, onSelectionChange }: MindMa
       }
 
       const selectedNodes = nodes.filter((n) => n.selected);
+
+      // Delete/Backspace はノード未選択でもエッジ削除のため処理を続行
+      if (event.key === "Delete" || event.key === "Backspace") {
+        event.preventDefault();
+        if (selectedNodes.length > 0) {
+          handleDeleteNodes(selectedNodes.map((n) => n.id));
+        }
+        const selectedEdges = edges.filter((e) => e.selected && e.type === "relation");
+        for (const edge of selectedEdges) {
+          deleteRelationEdge(edge.id);
+        }
+        return;
+      }
+
       if (selectedNodes.length === 0) return;
 
       switch (event.key) {
@@ -500,18 +514,6 @@ export function MindMapCanvasLive({ direction, mode, onSelectionChange }: MindMa
         case "Enter": {
           event.preventDefault();
           handleAddSibling(selectedNodes[selectedNodes.length - 1].id);
-          break;
-        }
-        // Delete/Backspace: 選択中の全ノード＋関連矢印を削除
-        case "Delete":
-        case "Backspace": {
-          event.preventDefault();
-          handleDeleteNodes(selectedNodes.map((n) => n.id));
-          // 選択中の relation edge も削除
-          const selectedEdges = edges.filter((e) => e.selected && e.type === "relation");
-          for (const edge of selectedEdges) {
-            deleteRelationEdge(edge.id);
-          }
           break;
         }
         // F2/Space: テキスト編集モード開始（単一選択時のみ）
