@@ -113,6 +113,7 @@ function storageToReactFlow(
         type: "relation",
         data: { color: data.color },
         animated: true,
+        interactionWidth: 20,
         markerEnd: { type: MarkerType.ArrowClosed, color: data.color },
       });
     } else {
