@@ -85,15 +85,18 @@ function storageToReactFlow(
 ): { nodes: MindMapNode[]; edges: MindMapEdge[] } {
   const nodes: MindMapNode[] = [];
   storageNodes.forEach((data) => {
+    const posX = data.posX ?? 0;
+    const posY = data.posY ?? 0;
     nodes.push({
       id: data.id,
       type: "mindmap",
-      position: { x: data.posX ?? 0, y: data.posY ?? 0 },
+      position: { x: posX, y: posY },
       data: {
         label: data.label,
         color: data.color,
         depth: data.depth,
         collapsed: data.collapsed,
+        manuallyPositioned: posX !== 0 || posY !== 0,
       },
     });
   });
@@ -222,7 +225,14 @@ export function MindMapCanvasLive({ direction, mode, onSelectionChange }: MindMa
     let layoutNodes: MindMapNode[];
     if (isNodeAdded || prevCount === 0) {
       const result = calculateLayout(rfNodes, rfEdges, direction);
-      layoutNodes = result.nodes;
+      // 手動配置済みノードは Storage の位置を維持
+      layoutNodes = result.nodes.map((ln) => {
+        const original = rfNodes.find((n) => n.id === ln.id);
+        if (original && original.data.manuallyPositioned) {
+          return { ...ln, position: original.position };
+        }
+        return ln;
+      });
     } else {
       layoutNodes = rfNodes;
     }
@@ -451,6 +461,15 @@ export function MindMapCanvasLive({ direction, mode, onSelectionChange }: MindMa
     []
   );
 
+  // 関連矢印（relation edge）の削除
+  const deleteRelationEdge = useMutation(
+    ({ storage }, edgeId: string) => {
+      const edgesMap = storage.get("edges");
+      edgesMap.delete(edgeId);
+    },
+    []
+  );
+
   // XMind風キーボードショートカット
   const handleKeyDown = useCallback(
     (event: React.KeyboardEvent) => {
@@ -478,11 +497,16 @@ export function MindMapCanvasLive({ direction, mode, onSelectionChange }: MindMa
           handleAddSibling(selectedNodes[selectedNodes.length - 1].id);
           break;
         }
-        // Delete/Backspace: 選択中の全ノードを削除
+        // Delete/Backspace: 選択中の全ノード＋関連矢印を削除
         case "Delete":
         case "Backspace": {
           event.preventDefault();
           handleDeleteNodes(selectedNodes.map((n) => n.id));
+          // 選択中の relation edge も削除
+          const selectedEdges = edges.filter((e) => e.selected && e.type === "relation");
+          for (const edge of selectedEdges) {
+            deleteRelationEdge(edge.id);
+          }
           break;
         }
         // F2/Space: テキスト編集モード開始（単一選択時のみ）
@@ -514,7 +538,7 @@ export function MindMapCanvasLive({ direction, mode, onSelectionChange }: MindMa
         }
       }
     },
-    [nodes, handleAddChild, handleAddSibling, handleDeleteNodes]
+    [nodes, edges, handleAddChild, handleAddSibling, handleDeleteNodes, deleteRelationEdge]
   );
 
   // マウス移動でプレゼンス更新
@@ -748,6 +772,7 @@ export function MindMapCanvasLive({ direction, mode, onSelectionChange }: MindMa
           maxZoom={2}
           proOptions={{ hideAttribution: true }}
           deleteKeyCode={null}
+          edgesFocusable={true}
           panOnDrag={mode === "hand"}
           panOnScroll={mode === "pointer" || mode === "text"}
           panOnScrollMode={PanOnScrollMode.Free}
