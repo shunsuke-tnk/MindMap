@@ -85,18 +85,15 @@ function storageToReactFlow(
 ): { nodes: MindMapNode[]; edges: MindMapEdge[] } {
   const nodes: MindMapNode[] = [];
   storageNodes.forEach((data) => {
-    const posX = data.posX ?? 0;
-    const posY = data.posY ?? 0;
     nodes.push({
       id: data.id,
       type: "mindmap",
-      position: { x: posX, y: posY },
+      position: { x: data.posX ?? 0, y: data.posY ?? 0 },
       data: {
         label: data.label,
         color: data.color,
         depth: data.depth,
         collapsed: data.collapsed,
-        manuallyPositioned: posX !== 0 || posY !== 0,
       },
     });
   });
@@ -155,7 +152,6 @@ export function MindMapCanvasLive({ direction, mode, onSelectionChange }: MindMa
   const { calculateLayout } = useMindMapLayout();
   const layoutTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevStorageRef = useRef<string>("");
-  const prevNodeCountRef = useRef<number>(0);
 
   // 追加直後に編集モードに入るノードID を保持する ref
   const pendingEditNodeRef = useRef<string | null>(null);
@@ -198,6 +194,21 @@ export function MindMapCanvasLive({ direction, mode, onSelectionChange }: MindMa
     []
   );
 
+  // レイアウト計算後に全ノードの位置を一括保存
+  const saveAllNodePositions = useMutation(
+    ({ storage }, positions: Array<{ id: string; x: number; y: number }>) => {
+      const nodesMap = storage.get("nodes");
+      for (const pos of positions) {
+        const node = nodesMap.get(pos.id);
+        if (node) {
+          node.set("posX", pos.x);
+          node.set("posY", pos.y);
+        }
+      }
+    },
+    []
+  );
+
   // Storage が変更されたらレイアウト再計算
   useEffect(() => {
     if (!storageNodes || !storageEdges) return;
@@ -215,26 +226,23 @@ export function MindMapCanvasLive({ direction, mode, onSelectionChange }: MindMa
       storageEdges
     );
 
-    // ノード数が増えた（追加）or 初回のみレイアウト再計算
-    // ラベル変更やドラッグ移動では Storage の posX/posY をそのまま使う
-    const currentNodeCount = storageNodes.size;
-    const prevCount = prevNodeCountRef.current;
-    const isNodeAdded = currentNodeCount > prevCount;
-    prevNodeCountRef.current = currentNodeCount;
+    // 常にレイアウト計算を実行し、一貫した配置を保つ
+    const { nodes: layoutNodes } = calculateLayout(rfNodes, rfEdges, direction);
 
-    let layoutNodes: MindMapNode[];
-    if (isNodeAdded || prevCount === 0) {
-      const result = calculateLayout(rfNodes, rfEdges, direction);
-      // 手動配置済みノードは Storage の位置を維持
-      layoutNodes = result.nodes.map((ln) => {
-        const original = rfNodes.find((n) => n.id === ln.id);
-        if (original && original.data.manuallyPositioned) {
-          return { ...ln, position: original.position };
-        }
-        return ln;
-      });
-    } else {
-      layoutNodes = rfNodes;
+    // レイアウト計算後の位置を Storage に保存（次回の変更検知で無限ループしないよう、
+    // 位置が変わったノードのみ更新）
+    const positionsToSave: Array<{ id: string; x: number; y: number }> = [];
+    for (const ln of layoutNodes) {
+      const original = rfNodes.find((n) => n.id === ln.id);
+      if (!original) continue;
+      const dx = Math.abs(ln.position.x - original.position.x);
+      const dy = Math.abs(ln.position.y - original.position.y);
+      if (dx > 0.5 || dy > 0.5) {
+        positionsToSave.push({ id: ln.id, x: ln.position.x, y: ln.position.y });
+      }
+    }
+    if (positionsToSave.length > 0) {
+      saveAllNodePositions(positionsToSave);
     }
 
     // コメントノードを追加
@@ -278,20 +286,16 @@ export function MindMapCanvasLive({ direction, mode, onSelectionChange }: MindMa
     setEdges(rfEdges);
 
     if (layoutTimeoutRef.current) clearTimeout(layoutTimeoutRef.current);
-    if (isNodeAdded || prevCount === 0) {
+    if (pendingId) {
       layoutTimeoutRef.current = setTimeout(() => {
         fitView({ padding: 0.3 });
-        // レイアウト確定後に編集モードに入る
-        if (pendingId && requestEditRef.current) {
+        if (requestEditRef.current) {
           requestEditRef.current(pendingId, "overwrite");
           pendingEditNodeRef.current = null;
         }
       }, 120);
-    } else if (pendingId && requestEditRef.current) {
-      requestEditRef.current(pendingId, "overwrite");
-      pendingEditNodeRef.current = null;
     }
-  }, [storageNodes, storageEdges, storageComments, direction, calculateLayout, setNodes, setEdges, fitView, handleCommentChange, handleCommentDelete, handleCommentStyleChange]);
+  }, [storageNodes, storageEdges, storageComments, direction, calculateLayout, setNodes, setEdges, fitView, handleCommentChange, handleCommentDelete, handleCommentStyleChange, saveAllNodePositions]);
 
   // ラベル変更
   const handleLabelChange = useMutation(
